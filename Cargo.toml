@@ -1,0 +1,29 @@
+[package]
+name = "herdr-fzf-terminal-browser"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "herdr plugin: pick a URL from the current pane with fzf and open it in terminal-browser"
+license = "MIT"
+repository = "https://github.com/to4iki/herdr-fzf-terminal-browser"
+readme = "README.md"
+publish = false
+
+[[bin]]
+name = "herdr-fzf-terminal-browser"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+toml = "1"
+
+[lints.clippy]
+pedantic = "warn"

@@ -1,0 +1,7 @@
+[workspace]
+# herdr builds the plugin from source; there is nothing to publish to crates.io.
+publish = false
+git_release_enable = true
+git_tag_name = "v{{ version }}"
+# Tag and release only when the release PR is merged, not on every push to main.
+release_always = false

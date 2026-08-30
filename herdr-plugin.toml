@@ -1,0 +1,36 @@
+id = "to4iki.fzf-terminal-browser"
+name = "fzf terminal-browser"
+version = "0.1.0"
+min_herdr_version = "0.8.2"
+description = "Pick a URL from the current pane with fzf and open it in terminal-browser (split pane or new tab)"
+platforms = ["macos", "linux"]
+
+# Built from source at install time (needs cargo), like other Rust herdr plugins.
+[[build]]
+command = ["cargo", "build", "--release", "--locked"]
+
+# Keybinding target. Actions have no TTY, so this only opens the `picker` popup, handing it the
+# pane the key was pressed in (a popup process gets no HERDR_PANE_ID of its own).
+[[actions]]
+id = "pick"
+title = "Open URL in terminal-browser"
+contexts = ["pane"]
+command = ["./target/release/herdr-fzf-terminal-browser", "pick"]
+
+# The fzf UI. A popup is a real PTY that closes when the command exits and never changes the
+# tiled layout. An overlay was tried and rejected: its zoom in and out is more disruptive.
+[[panes]]
+id = "picker"
+title = "fzf terminal-browser"
+placement = "popup"
+width = "80%"
+height = "50%"
+command = ["./target/release/herdr-fzf-terminal-browser", "picker"]
+
+# The browser pane. The picker opens it as a split next to the source pane; the command becomes
+# `terminal-browser open <url>` directly, so no shell prompt is echoed while the browser starts.
+[[panes]]
+id = "browser"
+title = "terminal-browser"
+placement = "split"
+command = ["./target/release/herdr-fzf-terminal-browser", "browser"]

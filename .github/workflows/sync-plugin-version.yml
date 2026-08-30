@@ -1,0 +1,29 @@
+name: Sync plugin version
+
+# release-plz bumps Cargo.toml in its release PR but knows nothing about herdr-plugin.toml.
+# Follow up on that PR branch so the manifest advertises the same version.
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  sync:
+    if: ${{ startsWith(github.head_ref, 'release-plz-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - run: scripts/sync-plugin-version.sh
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- herdr-plugin.toml; then
+            echo "already in sync"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: sync herdr-plugin.toml version"
+          git push
