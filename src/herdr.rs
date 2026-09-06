@@ -1,5 +1,5 @@
-//! The herdr CLI (`HERDR_BIN_PATH`, else `herdr` in PATH): reading what a pane shows, opening
-//! plugin panes, and showing a notification.
+//! The herdr CLI (`HERDR_BIN_PATH`, else `herdr` in PATH): reading what a pane shows and opening
+//! plugin panes.
 
 use std::process::Command;
 
@@ -70,11 +70,6 @@ pub fn read_screen(env: &Env, pane_id: &str) -> Result<String, HerdrError> {
     let scroll = parse_pane_get(&String::from_utf8_lossy(&out.stdout))?;
     let out = run(env, pane_read_args(pane_id, choose_source(scroll)))?;
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-/// `herdr notification show <title> --sound none`: a quiet toast in the herdr UI.
-pub fn notify(env: &Env, title: &str) -> Result<(), HerdrError> {
-    run(env, ["notification", "show", title, "--sound", "none"]).map(|_| ())
 }
 
 /// A `herdr plugin pane open` request for one of this plugin's entrypoints.

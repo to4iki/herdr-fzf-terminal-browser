@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::ExitCode;
 
 pub const NAME: &str = env!("CARGO_PKG_NAME");
-/// Shown (as a herdr notification, or in the popup) when the pane has no URL to pick.
+/// Logged by the action, and shown in the popup, when the pane has no URL to pick.
 pub const NO_URLS: &str = "No URLs on screen";
 
 /// Exit code for a command that reports errors on stderr (actions and shell use).

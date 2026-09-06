@@ -1,6 +1,8 @@
 //! `pick`: the herdr action behind the keybinding. It has no TTY, so it cannot show fzf itself:
 //! it checks that the pane shows at least one URL, then opens the `picker` popup for that pane.
-//! With nothing to pick it only raises a herdr notification, so no empty popup appears.
+//! With nothing to pick it does nothing visible: no empty popup, and no notification either —
+//! `herdr notification show` follows the user's channel and may land in the OS notification
+//! centre, which is far louder than the situation deserves.
 
 use std::error::Error;
 use std::process::ExitCode;
@@ -20,8 +22,6 @@ pub fn run(env: &Env) -> ExitCode {
 fn pick(env: &Env) -> Result<(), Box<dyn Error>> {
     let source = SourcePane::from_env(env)?;
     if extract_urls(&herdr::read_screen(env, source.pane_id())?).is_empty() {
-        // Best effort: the notification is feedback, not something to fail over.
-        let _ = herdr::notify(env, NO_URLS);
         eprintln!("{NAME}: {NO_URLS}");
         return Ok(());
     }
