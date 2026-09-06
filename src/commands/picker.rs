@@ -3,14 +3,14 @@
 
 use std::process::ExitCode;
 
-use crate::Env;
 use crate::context::SourcePane;
 use crate::extract::extract_urls;
 use crate::fzf::{self, FzfError, Key};
-use crate::opener::{copy_to_clipboard, find_in_path};
+use crate::opener::copy_to_clipboard;
 use crate::terminal_browser::TbError;
 use crate::terminal_browser::cli::{self, CliTerminalBrowser};
 use crate::terminal_browser::open_url;
+use crate::{Env, find_in_path};
 use crate::{herdr, ui};
 
 #[must_use]
@@ -48,14 +48,11 @@ fn pick(env: &Env) -> Result<(), Outcome> {
     let browser = find_in_path(env, cli::BIN).ok_or_else(|| fail(TbError::NotFound))?;
 
     // What the user sees is what they can pick: the pane's current screen, nothing more.
-    let screen = herdr::read_screen(env, source.pane_id()).map_err(fail)?;
-    let urls = extract_urls(&screen.text);
+    // `pick` already checked for URLs; this only triggers if the screen changed in between.
+    let text = herdr::read_screen(env, source.pane_id()).map_err(fail)?;
+    let urls = extract_urls(&text);
     if urls.is_empty() {
-        return Err(Outcome::Info(format!(
-            "No URLs on screen in pane {} ({} rows).",
-            source.pane_id(),
-            screen.scroll.viewport_rows
-        )));
+        return Err(Outcome::Info(ui::NO_URLS.to_string()));
     }
 
     let selection = match fzf::run(&urls) {

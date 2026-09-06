@@ -5,11 +5,8 @@ use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader, Write};
 
 pub const NAME: &str = "herdr-fzf-terminal-browser";
-
-/// One status line on stderr (the popup's terminal).
-pub fn status(msg: &str) {
-    eprintln!("{msg}");
-}
+/// Shown (as a herdr notification, or in the popup) when the pane has no URL to pick.
+pub const NO_URLS: &str = "No URLs on screen";
 
 /// Prints "Press Enter to close" and waits, when a controlling terminal exists.
 pub fn wait_for_enter() {

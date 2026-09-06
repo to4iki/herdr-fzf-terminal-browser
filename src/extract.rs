@@ -77,7 +77,7 @@ fn count(s: &str, c: char) -> usize {
 }
 
 /// Drops trailing punctuation that belongs to the surrounding prose, and closing brackets that
-/// have no matching opener inside the URL (`[x](https://a/b)` → `https://a/b`, while
+/// have no matching opener inside the URL (`[x](https://a/b)` yields `https://a/b`, while
 /// `https://en.wikipedia.org/wiki/Foo_(bar)` keeps its `)`).
 #[must_use]
 pub fn trim_trailing(mut s: &str) -> &str {

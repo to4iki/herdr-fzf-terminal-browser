@@ -3,13 +3,12 @@
 
 use std::process::ExitCode;
 
-use crate::Env;
 use crate::context::SourcePane;
-use crate::opener::find_in_path;
 use crate::terminal_browser::TbError;
 use crate::terminal_browser::cli::{self, CliTerminalBrowser};
 use crate::terminal_browser::open_url;
 use crate::ui::NAME;
+use crate::{Env, find_in_path};
 
 #[must_use]
 pub fn run(env: &Env, url: &str) -> ExitCode {

@@ -9,8 +9,9 @@ platforms = ["macos", "linux"]
 [[build]]
 command = ["cargo", "build", "--release", "--locked"]
 
-# Keybinding target. Actions have no TTY, so this only opens the `picker` popup, handing it the
-# pane the key was pressed in (a popup process gets no HERDR_PANE_ID of its own).
+# Keybinding target. Actions have no TTY, so this checks the pane for URLs and opens the `picker`
+# popup for it (a popup process gets no HERDR_PANE_ID of its own, hence the hand-off). With no URL
+# on screen it only shows a herdr notification.
 [[actions]]
 id = "pick"
 title = "Open URL in terminal-browser"

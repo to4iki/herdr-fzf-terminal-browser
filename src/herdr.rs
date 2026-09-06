@@ -60,28 +60,23 @@ pub fn choose_source(scroll: Scroll) -> ReadSource {
     }
 }
 
-/// The text a pane currently shows.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Screen {
-    pub text: String,
-    pub scroll: Scroll,
-    pub source: ReadSource,
-}
-
 /// Reads what the pane shows right now: `pane get` for the viewport, then the matching `pane read`.
 ///
 /// # Errors
 ///
 /// [`HerdrError`] when herdr is missing, a command fails, or its output cannot be parsed.
-pub fn read_screen(env: &Env, pane_id: &str) -> Result<Screen, HerdrError> {
+pub fn read_screen(env: &Env, pane_id: &str) -> Result<String, HerdrError> {
     let scroll = pane_scroll(env, pane_id)?;
-    let source = choose_source(scroll);
-    let text = read_pane(env, pane_id, source)?;
-    Ok(Screen {
-        text,
-        scroll,
-        source,
-    })
+    read_pane(env, pane_id, choose_source(scroll))
+}
+
+/// `herdr notification show <title> --sound none`: a quiet toast in the herdr UI.
+///
+/// # Errors
+///
+/// [`HerdrError`] when herdr is missing or the command fails.
+pub fn notify(env: &Env, title: &str) -> Result<(), HerdrError> {
+    run(env, &notification_show_args(title)).map(|_| ())
 }
 
 /// `herdr pane get <pane>`, reduced to its scroll state.
@@ -152,6 +147,13 @@ fn run(env: &Env, args: &[String]) -> Result<Output, HerdrError> {
 
 fn pane_get_args(pane_id: &str) -> Vec<String> {
     vec!["pane".into(), "get".into(), pane_id.into()]
+}
+
+fn notification_show_args(title: &str) -> Vec<String> {
+    ["notification", "show", title, "--sound", "none"]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
 }
 
 fn pane_read_args(pane_id: &str, source: ReadSource) -> Vec<String> {
@@ -271,6 +273,16 @@ mod tests {
     #[test]
     fn builds_read_and_get_args() {
         assert_eq!(pane_get_args("w1:p1"), ["pane", "get", "w1:p1"]);
+        assert_eq!(
+            notification_show_args("No URLs on screen"),
+            [
+                "notification",
+                "show",
+                "No URLs on screen",
+                "--sound",
+                "none"
+            ]
+        );
         assert_eq!(
             pane_read_args("w1:p1", ReadSource::RecentUnwrapped { lines: 69 }),
             [

@@ -1,12 +1,11 @@
 //! ctrl-y: copy the picked URL with whatever clipboard tool the platform has.
 
 use std::io::Write as _;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use thiserror::Error;
 
-use crate::Env;
+use crate::{Env, find_in_path};
 
 #[derive(Debug, Error)]
 pub enum ClipboardError {
@@ -14,15 +13,6 @@ pub enum ClipboardError {
     NoTool,
     #[error("`{cmd}` failed: {message}")]
     Failed { cmd: String, message: String },
-}
-
-/// Looks a program up in `PATH`.
-#[must_use]
-pub fn find_in_path(env: &Env, name: &str) -> Option<PathBuf> {
-    let path = env.get("PATH")?;
-    std::env::split_paths(path)
-        .map(|dir| dir.join(name))
-        .find(|candidate| candidate.is_file())
 }
 
 fn clipboard_command(env: &Env) -> Result<Vec<&'static str>, ClipboardError> {

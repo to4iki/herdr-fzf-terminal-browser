@@ -35,7 +35,8 @@ description = "open url in terminal-browser"
 ```
 
 Press `prefix+f` in any pane: the URLs currently on that pane's screen are listed, newest first.
-What you see is what you can pick — no more, no less.
+What you see is what you can pick — no more, no less. If there is none, a small herdr notification
+says so and no popup opens.
 
 | Key | Action |
 |---|---|
@@ -62,8 +63,8 @@ Wikipedia-style `Foo_(bar)` is kept). Duplicates collapse to their newest occurr
 
 ## How it works
 
-`prefix+f` runs the plugin action `pick`. Actions have no TTY, so it only opens the `picker` popup,
-passing the current pane along as `FZF_TB_SOURCE_PANE` / `FZF_TB_SOURCE_TAB`.
+`prefix+f` runs the plugin action `pick`. Actions have no TTY, so it checks the pane for URLs and
+then opens the `picker` popup, passing the pane along as `FZF_TB_SOURCE_PANE` / `FZF_TB_SOURCE_TAB`.
 The picker asks herdr for the pane's viewport (`herdr pane get`), reads exactly that many rows with
 `herdr pane read --source recent-unwrapped` (or `--source visible` while scrolled back), extracts
 URLs, and runs fzf. To open, it runs `terminal-browser ls` with `HERDR_PANE_ID` / `HERDR_TAB_ID` set to the source
@@ -86,7 +87,6 @@ Kept out of the first release on purpose. Open an issue if one of these would he
   (the `terminal-browser` CLI costs ≈175 ms to start)
 - URLs hidden behind OSC 8 hyperlinks (`pane read --format ansi`)
 - Ctrl+click on a URL (`[[link_handlers]]`) opening in terminal-browser
-- Split direction / size other than a 50% split to the right
 
 ## Command line
 

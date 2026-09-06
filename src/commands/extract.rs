@@ -1,5 +1,5 @@
 //! `extract`: stdin in, one URL per line out (newest first). Handy for scripting and for checking
-//! what the picker would list: `herdr pane read <pane> --source recent-unwrapped | ... extract`.
+//! what the picker would list: `herdr pane read <pane> --source visible | ... extract`.
 
 use std::io::Read as _;
 use std::process::ExitCode;
