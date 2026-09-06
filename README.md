@@ -72,8 +72,8 @@ pane, so it sees the browsers in that herdr tab. If there is one, the URL goes t
 `terminal-browser new-tab`; otherwise the picker asks herdr for a split pane next to the source pane
 whose command is `terminal-browser open <url>` — focus stays where you were either way.
 
-The plugin runs only `herdr`, `fzf`, and `terminal-browser`, and writes nothing outside its build directory.
-There is no configuration in this release.
+The plugin runs only `herdr`, `fzf`, `terminal-browser`, and (for `ctrl-y`) the platform's clipboard tool,
+and writes nothing outside its build directory. There is no configuration in this release.
 
 ## Not yet / ideas for later
 

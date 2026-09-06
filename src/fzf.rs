@@ -8,12 +8,20 @@
 //! scrolling before the list appears.
 
 use std::fmt::Write as _;
-use std::io::Write as _;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use thiserror::Error;
 
+use crate::process::{self, RunError, Stderr};
+
 pub const BIN: &str = "fzf";
+const ARGS: [&str; 5] = [
+    "--expect=ctrl-y",
+    "--no-preview",
+    "--layout=reverse",
+    "--prompt=url> ",
+    "--header=enter: open in terminal-browser | ctrl-y: copy | esc: cancel",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -36,26 +44,23 @@ pub enum FzfError {
     /// Esc / ctrl-c, or no match: nothing was chosen.
     #[error("cancelled")]
     Cancelled,
-    #[error("fzf exited with {code:?}")]
-    Failed { code: Option<i32> },
+    #[error("{0}")]
+    Failed(RunError),
     #[error("unexpected fzf output: {0}")]
     Parse(String),
-    #[error("could not run fzf: {0}")]
-    Io(String),
 }
 
-#[must_use]
-pub fn args() -> Vec<String> {
-    [
-        "--expect=ctrl-y",
-        "--no-preview",
-        "--layout=reverse",
-        "--prompt=url> ",
-        "--header=enter: open in terminal-browser | ctrl-y: copy | esc: cancel",
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+impl From<RunError> for FzfError {
+    fn from(e: RunError) -> Self {
+        match e {
+            RunError::NotFound(_) => Self::NotFound,
+            RunError::Failed {
+                code: Some(1 | 130),
+                ..
+            } => Self::Cancelled,
+            other => Self::Failed(other),
+        }
+    }
 }
 
 /// One line per URL: a right-aligned index, two spaces, the URL.
@@ -69,11 +74,6 @@ pub fn format_items(urls: &[String]) -> String {
 }
 
 /// Parses fzf's stdout: the `--expect` key line, then the selected line minus its index.
-///
-/// # Errors
-///
-/// [`FzfError::Cancelled`] when nothing was selected; [`FzfError::Parse`] for an unknown key or
-/// a line without a URL.
 pub fn parse_output(stdout: &str) -> Result<Selection, FzfError> {
     let mut lines = stdout.lines();
     let key = match lines.next().unwrap_or("").trim() {
@@ -94,34 +94,14 @@ pub fn parse_output(stdout: &str) -> Result<Selection, FzfError> {
     }
 }
 
-/// Runs fzf over the URLs and returns the selection.
-///
-/// # Errors
-///
-/// [`FzfError::Cancelled`] when the user aborts; other variants for a missing or failing fzf.
+/// Runs fzf over the URLs and returns the selection ([`FzfError::Cancelled`] when the user aborts).
 pub fn run(urls: &[String]) -> Result<Selection, FzfError> {
-    let mut child = Command::new(BIN)
-        .args(args())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => FzfError::NotFound,
-            _ => FzfError::Io(e.to_string()),
-        })?;
-    if let Some(mut stdin) = child.stdin.take() {
-        // fzf may exit early (esc); a broken pipe here is not worth reporting.
-        let _ = stdin.write_all(format_items(urls).as_bytes());
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|e| FzfError::Io(e.to_string()))?;
-    match output.status.code() {
-        Some(0) => parse_output(&String::from_utf8_lossy(&output.stdout)),
-        Some(1 | 130) => Err(FzfError::Cancelled),
-        code => Err(FzfError::Failed { code }),
-    }
+    let out = process::run(
+        Command::new(BIN).args(ARGS),
+        Some(format_items(urls).as_bytes()),
+        Stderr::Inherit,
+    )?;
+    parse_output(&String::from_utf8_lossy(&out.stdout))
 }
 
 #[cfg(test)]
@@ -151,5 +131,19 @@ mod tests {
             parse_output("ctrl-x\n  1  x\n"),
             Err(FzfError::Parse(_))
         ));
+    }
+
+    #[test]
+    fn esc_and_no_match_are_cancellations() {
+        let cancelled = |code| {
+            FzfError::from(RunError::Failed {
+                cmd: "fzf".into(),
+                code: Some(code),
+                stderr: String::new(),
+            })
+        };
+        assert!(matches!(cancelled(130), FzfError::Cancelled));
+        assert!(matches!(cancelled(1), FzfError::Cancelled));
+        assert!(matches!(cancelled(2), FzfError::Failed(_)));
     }
 }

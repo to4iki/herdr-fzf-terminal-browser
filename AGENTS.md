@@ -19,15 +19,16 @@ herdr tab. Only the concept comes from tmux-fzf-url; the implementation is origi
 
 ```sh
 cargo test
-cargo clippy -- -D warnings
+cargo clippy --all-targets -- -D warnings
 cargo fmt
 cargo build --release && herdr plugin link .   # local E2E inside herdr; bind prefix+f to to4iki.fzf-terminal-browser.pick
 ```
 
 ## Coding Guide
 
-- Keep `extract.rs` and `context.rs` pure. Process calls go behind the `TerminalBrowser` trait or
-  thin `Command` wrappers (`herdr.rs`, `fzf.rs`), so arg builders and parsers stay unit-testable.
+- Keep `extract.rs` and `context.rs` pure. Every external program goes through `process::run`;
+  terminal-browser additionally sits behind the `TerminalBrowser` trait so `open_url` is tested
+  with an in-memory fake, and arg builders / parsers stay unit-testable.
 - Spawn with argv arrays (`Command::args`), never a shell string.
 - Keep the surface small: five subcommands, no config. Add features only when asked.
 - Specify at least the major version when adding a crate.

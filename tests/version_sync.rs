@@ -1,8 +1,11 @@
-//! `herdr-plugin.toml` must advertise the same version as `Cargo.toml`, or the marketplace and
-//! `herdr plugin list` show a stale number after a release.
+//! `herdr-plugin.toml` must agree with the crate: same version (or the marketplace and
+//! `herdr plugin list` show a stale number after a release), same plugin id, and pane entrypoints
+//! that match the names the code opens.
+
+use herdr_fzf_terminal_browser::herdr;
 
 #[test]
-fn plugin_manifest_version_matches_cargo() {
+fn plugin_manifest_matches_the_crate() {
     let manifest =
         std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/herdr-plugin.toml"))
             .expect("herdr-plugin.toml is readable");
@@ -15,7 +18,19 @@ fn plugin_manifest_version_matches_cargo() {
     );
     assert_eq!(
         table["id"].as_str().expect("id is a string"),
-        herdr_fzf_terminal_browser::PLUGIN_ID,
-        "PLUGIN_ID in lib.rs must equal the manifest id"
+        herdr::PLUGIN_ID,
+        "herdr::PLUGIN_ID must equal the manifest id"
     );
+    let panes: Vec<&str> = table["panes"]
+        .as_array()
+        .expect("[[panes]]")
+        .iter()
+        .map(|p| p["id"].as_str().expect("pane id"))
+        .collect();
+    for entrypoint in [herdr::PICKER_ENTRYPOINT, herdr::BROWSER_ENTRYPOINT] {
+        assert!(
+            panes.contains(&entrypoint),
+            "manifest lacks the `{entrypoint}` pane"
+        );
+    }
 }

@@ -72,10 +72,6 @@ pub fn strip_ansi(line: &str) -> String {
     ANSI_CSI.replace_all(&no_osc, "").into_owned()
 }
 
-fn count(s: &str, c: char) -> usize {
-    s.chars().filter(|&x| x == c).count()
-}
-
 /// Drops trailing punctuation that belongs to the surrounding prose, and closing brackets that
 /// have no matching opener inside the URL (`[x](https://a/b)` yields `https://a/b`, while
 /// `https://en.wikipedia.org/wiki/Foo_(bar)` keeps its `)`).
@@ -87,9 +83,9 @@ pub fn trim_trailing(mut s: &str) -> &str {
         };
         let cut = match last {
             '.' | ',' | ';' | ':' | '!' | '?' | '\'' | '"' | '…' => true,
-            ')' => count(s, '(') < count(s, ')'),
-            ']' => count(s, '[') < count(s, ']'),
-            '}' => count(s, '{') < count(s, '}'),
+            ')' => s.matches('(').count() < s.matches(')').count(),
+            ']' => s.matches('[').count() < s.matches(']').count(),
+            '}' => s.matches('{').count() < s.matches('}').count(),
             _ => false,
         };
         if !cut {

@@ -8,7 +8,7 @@
 
 use thiserror::Error;
 
-use crate::Env;
+use crate::{Env, env_var};
 
 pub const ENV_SOURCE_PANE: &str = "FZF_TB_SOURCE_PANE";
 pub const ENV_SOURCE_TAB: &str = "FZF_TB_SOURCE_TAB";
@@ -31,25 +31,27 @@ pub struct MissingSource;
 impl SourcePane {
     /// Reads the source pane, trying `FZF_TB_SOURCE_PANE`/`_TAB` (set by the action for the popup)
     /// then `HERDR_PANE_ID`/`HERDR_TAB_ID` (injected into actions and shell panes).
-    ///
-    /// # Errors
-    ///
-    /// [`MissingSource`] when neither pair is fully set.
     pub fn from_env(env: &Env) -> Result<Self, MissingSource> {
-        let get = |key: &str| {
-            env.get(key)
-                .map(|v| v.trim().to_string())
-                .filter(|v| !v.is_empty())
-        };
-        for (pane_key, tab_key) in [
+        [
             (ENV_SOURCE_PANE, ENV_SOURCE_TAB),
             ("HERDR_PANE_ID", "HERDR_TAB_ID"),
-        ] {
-            if let (Some(pane_id), Some(tab_id)) = (get(pane_key), get(tab_key)) {
-                return Ok(Self { pane_id, tab_id });
-            }
+        ]
+        .into_iter()
+        .find_map(|(pane_key, tab_key)| {
+            Some(Self {
+                pane_id: env_var(env, pane_key)?.to_string(),
+                tab_id: env_var(env, tab_key)?.to_string(),
+            })
+        })
+        .ok_or(MissingSource)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new(pane_id: &str, tab_id: &str) -> Self {
+        Self {
+            pane_id: pane_id.into(),
+            tab_id: tab_id.into(),
         }
-        Err(MissingSource)
     }
 
     #[must_use]
@@ -64,10 +66,19 @@ impl SourcePane {
 
     /// The `--env` pairs the action passes to the popup so it can recover this pane.
     #[must_use]
-    pub fn popup_env(&self) -> Vec<(String, String)> {
-        vec![
-            (ENV_SOURCE_PANE.to_string(), self.pane_id.clone()),
-            (ENV_SOURCE_TAB.to_string(), self.tab_id.clone()),
+    pub fn popup_env(&self) -> [(&'static str, &str); 2] {
+        [
+            (ENV_SOURCE_PANE, &self.pane_id),
+            (ENV_SOURCE_TAB, &self.tab_id),
+        ]
+    }
+
+    /// The variables that make terminal-browser treat this pane as "the pane I am in".
+    #[must_use]
+    pub fn herdr_env(&self) -> [(&'static str, &str); 2] {
+        [
+            ("HERDR_PANE_ID", &self.pane_id),
+            ("HERDR_TAB_ID", &self.tab_id),
         ]
     }
 }
@@ -92,13 +103,10 @@ mod tests {
             ("HERDR_TAB_ID", "w1:t1"),
         ]))
         .unwrap();
-        assert_eq!((s.pane_id(), s.tab_id()), ("w1:p9", "w1:t9"));
+        assert_eq!(s, SourcePane::new("w1:p9", "w1:t9"));
         assert_eq!(
-            s.popup_env(),
-            vec![
-                (ENV_SOURCE_PANE.to_string(), "w1:p9".to_string()),
-                (ENV_SOURCE_TAB.to_string(), "w1:t9".to_string()),
-            ]
+            s.herdr_env(),
+            [("HERDR_PANE_ID", "w1:p9"), ("HERDR_TAB_ID", "w1:t9")]
         );
 
         let s = SourcePane::from_env(&env(&[
@@ -106,13 +114,13 @@ mod tests {
             ("HERDR_TAB_ID", "w1:t1"),
         ]))
         .unwrap();
-        assert_eq!((s.pane_id(), s.tab_id()), ("w1:p1", "w1:t1"));
+        assert_eq!(s, SourcePane::new("w1:p1", "w1:t1"));
     }
 
     #[test]
     fn half_a_pair_or_nothing_is_missing() {
         assert_eq!(
-            SourcePane::from_env(&env(&[("HERDR_PANE_ID", "w1:p1")])),
+            SourcePane::from_env(&env(&[("HERDR_PANE_ID", "w1:p1"), ("HERDR_TAB_ID", " ")])),
             Err(MissingSource)
         );
         assert_eq!(SourcePane::from_env(&Env::new()), Err(MissingSource));

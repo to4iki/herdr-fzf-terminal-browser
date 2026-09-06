@@ -6,5 +6,3 @@ pub mod extract;
 pub mod open;
 pub mod pick;
 pub mod picker;
-
-pub const PICKER_ENTRYPOINT: &str = "picker";

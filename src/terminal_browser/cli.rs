@@ -4,62 +4,60 @@
 //! `terminal-browser open --split`: that splits with `herdr pane split` and then types the launch
 //! command into the new pane's shell, so the prompt and the echoed command are visible for the
 //! seconds the browser takes to start. Instead we ask herdr for a plugin split pane running our
-//! own `browser` entrypoint, which execs `terminal-browser open <url>` directly.
+//! own `browser` entrypoint, which becomes `terminal-browser open <url>` directly ([`exec_open`]).
 
+use std::cell::RefCell;
+use std::os::unix::process::CommandExt as _;
 use std::path::PathBuf;
-use std::process::{Command, Output, Stdio};
+use std::process::Command;
 
 use serde::Deserialize;
 
 use super::{BrowserInstance, TbError, TerminalBrowser};
-use crate::Env;
 use crate::context::SourcePane;
-use crate::herdr::{self, PluginPaneOpen};
+use crate::herdr::{self, BROWSER_ENTRYPOINT, PluginPaneOpen};
+use crate::process::{self, Running, Stderr};
+use crate::{Env, find_in_path};
 
 pub const BIN: &str = "terminal-browser";
 /// Env for the `browser` entrypoint: the URL to open.
 pub const ENV_URL: &str = "FZF_TB_URL";
-/// Env for the `browser` entrypoint: the terminal-browser path the picker already resolved.
+/// Env for the `browser` entrypoint: the terminal-browser path the picker resolved. Only a
+/// shell-run `open` needs it (the user's PATH may differ from the herdr server's); the herdr-run
+/// action → popup → browser-pane chain would find it either way.
 pub const ENV_BROWSER: &str = "FZF_TB_BROWSER";
-pub const BROWSER_ENTRYPOINT: &str = "browser";
 
-#[derive(Debug, Clone)]
-pub struct CliTerminalBrowser {
+pub struct CliTerminalBrowser<'a> {
     browser: PathBuf,
-    env: Env,
+    env: &'a Env,
+    /// A `ls --json` started by [`TerminalBrowser::prefetch`], drained by the next `list`.
+    pending_ls: RefCell<Option<Running>>,
 }
 
-impl CliTerminalBrowser {
-    /// `browser` is the terminal-browser binary the caller resolved from `PATH`.
-    #[must_use]
-    pub fn new(browser: PathBuf, env: Env) -> Self {
-        Self { browser, env }
+impl<'a> CliTerminalBrowser<'a> {
+    /// Finds terminal-browser in `PATH`; fails early so nothing is picked when it is missing.
+    pub fn locate(env: &'a Env) -> Result<Self, TbError> {
+        Ok(Self {
+            browser: find_in_path(env, BIN).ok_or(TbError::NotFound)?,
+            env,
+            pending_ls: RefCell::new(None),
+        })
     }
 
-    /// Runs terminal-browser as if from inside the source pane: only the child's environment
-    /// gets `HERDR_PANE_ID` / `HERDR_TAB_ID` replaced.
-    fn run(&self, source: &SourcePane, args: &[&str]) -> Result<Output, TbError> {
-        let output = Command::new(&self.browser)
-            .args(args)
-            .env("HERDR_PANE_ID", source.pane_id())
-            .env("HERDR_TAB_ID", source.tab_id())
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .map_err(|e| match e.kind() {
-                std::io::ErrorKind::NotFound => TbError::NotFound,
-                _ => TbError::Io(e.to_string()),
-            })?;
-        if !output.status.success() {
-            return Err(TbError::CommandFailed {
-                cmd: args.join(" "),
-                code: output.status.code(),
-                stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-            });
-        }
-        Ok(output)
+    /// terminal-browser, run as if from inside the source pane (the child env alone gets
+    /// `HERDR_PANE_ID` / `HERDR_TAB_ID` replaced).
+    fn command(&self, source: &SourcePane, args: &[&str]) -> Command {
+        let mut cmd = Command::new(&self.browser);
+        cmd.args(args).envs(source.herdr_env());
+        cmd
     }
+}
+
+/// Replaces the current process with `terminal-browser open <url>` (the `browser` pane); only
+/// returns if that failed.
+#[must_use]
+pub fn exec_open(bin: &str, url: &str) -> std::io::Error {
+    Command::new(bin).args(["open", url]).exec()
 }
 
 /// One row of `ls --json`. Only what this plugin reads; other fields are ignored so
@@ -79,10 +77,7 @@ struct LsOutput {
 }
 
 fn parse_ls(json: &str) -> Result<Vec<BrowserInstance>, TbError> {
-    let out: LsOutput = serde_json::from_str(json).map_err(|e| TbError::Parse {
-        what: "ls --json output",
-        message: e.to_string(),
-    })?;
+    let out: LsOutput = serde_json::from_str(json).map_err(|e| TbError::Parse(e.to_string()))?;
     Ok(out
         .browsers
         .into_iter()
@@ -97,33 +92,52 @@ fn parse_ls(json: &str) -> Result<Vec<BrowserInstance>, TbError> {
         .collect())
 }
 
-impl TerminalBrowser for CliTerminalBrowser {
+impl TerminalBrowser for CliTerminalBrowser<'_> {
+    fn prefetch(&self, source: &SourcePane) {
+        // Best effort: a failure here just means `list` runs the command itself.
+        *self.pending_ls.borrow_mut() = process::spawn(
+            &mut self.command(source, &["ls", "--json"]),
+            None,
+            Stderr::Capture,
+        )
+        .ok();
+    }
+
     fn list(&self, source: &SourcePane) -> Result<Vec<BrowserInstance>, TbError> {
-        let out = self.run(source, &["ls", "--json"])?;
+        let running = match self.pending_ls.borrow_mut().take() {
+            Some(running) => running,
+            None => process::spawn(
+                &mut self.command(source, &["ls", "--json"]),
+                None,
+                Stderr::Capture,
+            )?,
+        };
+        let out = process::finish(running)?;
         parse_ls(&String::from_utf8_lossy(&out.stdout))
     }
 
     fn open_split(&self, source: &SourcePane, url: &str) -> Result<(), TbError> {
-        herdr::plugin_pane_open(
-            &self.env,
+        let browser = self.browser.to_string_lossy();
+        Ok(herdr::plugin_pane_open(
+            self.env,
             &PluginPaneOpen {
                 entrypoint: BROWSER_ENTRYPOINT,
                 placement: Some("split"),
                 target_pane: Some(source.pane_id()),
                 direction: Some("right"),
                 no_focus: true,
-                env: vec![
-                    (ENV_URL.to_string(), url.to_string()),
-                    (ENV_BROWSER.to_string(), self.browser.display().to_string()),
-                ],
+                env: &[(ENV_URL, url), (ENV_BROWSER, &browser)],
             },
-        )
-        .map_err(TbError::from)
+        )?)
     }
 
     fn new_tab(&self, source: &SourcePane, key: &str, url: &str) -> Result<(), TbError> {
-        self.run(source, &["new-tab", "--browser", key, url])
-            .map(|_| ())
+        process::run(
+            &mut self.command(source, &["new-tab", "--browser", key, url]),
+            None,
+            Stderr::Capture,
+        )?;
+        Ok(())
     }
 }
 
