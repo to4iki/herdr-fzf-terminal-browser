@@ -68,6 +68,14 @@ struct Record {
     key: Option<String>,
     pid: Option<u64>,
     in_current_tab: bool,
+    pane: Option<PaneRef>,
+}
+
+/// `"pane": {"tab": "w1:t1", "pane": "w1:p8"}` in a listing row.
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct PaneRef {
+    pane: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -87,6 +95,7 @@ fn parse_ls(json: &str) -> Result<Vec<BrowserInstance>, TbError> {
             Some(BrowserInstance {
                 key,
                 in_current_tab: r.in_current_tab,
+                pane_id: r.pane.and_then(|p| p.pane),
             })
         })
         .collect())
@@ -125,18 +134,28 @@ impl TerminalBrowser for CliTerminalBrowser<'_> {
                 placement: Some("split"),
                 target_pane: Some(source.pane_id()),
                 direction: Some("right"),
-                no_focus: true,
+                focus: true,
                 env: &[(ENV_URL, url), (ENV_BROWSER, &browser)],
             },
         )?)
     }
 
-    fn new_tab(&self, source: &SourcePane, key: &str, url: &str) -> Result<(), TbError> {
+    fn new_tab(
+        &self,
+        source: &SourcePane,
+        browser: &BrowserInstance,
+        url: &str,
+    ) -> Result<(), TbError> {
         process::run(
-            &mut self.command(source, &["new-tab", "--browser", key, url]),
+            &mut self.command(source, &["new-tab", "--browser", &browser.key, url]),
             None,
             Stderr::Capture,
         )?;
+        // Best effort: the tab is open either way, and a browser started outside this plugin is
+        // not a plugin pane, so herdr cannot focus it by id.
+        if let Some(pane_id) = &browser.pane_id {
+            let _ = herdr::plugin_pane_focus(self.env, pane_id);
+        }
         Ok(())
     }
 }
@@ -163,10 +182,12 @@ mod tests {
                 BrowserInstance {
                     key: "86811-1".into(),
                     in_current_tab: true,
+                    pane_id: Some("w12:p8".into()),
                 },
                 BrowserInstance {
                     key: "700".into(),
                     in_current_tab: false,
+                    pane_id: None,
                 },
             ]
         );

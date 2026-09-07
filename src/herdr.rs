@@ -80,13 +80,19 @@ pub struct PluginPaneOpen<'a> {
     pub placement: Option<&'a str>,
     pub target_pane: Option<&'a str>,
     pub direction: Option<&'a str>,
-    pub no_focus: bool,
+    /// Move focus to the new pane (herdr leaves focus alone by default).
+    pub focus: bool,
     pub env: &'a [(&'a str, &'a str)],
 }
 
 /// Opens a plugin pane entrypoint.
 pub fn plugin_pane_open(env: &Env, opts: &PluginPaneOpen) -> Result<(), HerdrError> {
     run(env, plugin_pane_open_args(opts)).map(|_| ())
+}
+
+/// Moves focus to a pane this plugin opened.
+pub fn plugin_pane_focus(env: &Env, pane_id: &str) -> Result<(), HerdrError> {
+    run(env, ["plugin", "pane", "focus", pane_id]).map(|_| ())
 }
 
 fn run<I, S>(env: &Env, args: I) -> Result<std::process::Output, HerdrError>
@@ -141,8 +147,8 @@ fn plugin_pane_open_args(opts: &PluginPaneOpen) -> Vec<String> {
             args.extend([flag.into(), value.into()]);
         }
     }
-    if opts.no_focus {
-        args.push("--no-focus".into());
+    if opts.focus {
+        args.push("--focus".into());
     }
     for (k, v) in opts.env {
         args.extend(["--env".into(), format!("{k}={v}")]);
@@ -254,7 +260,7 @@ mod tests {
             placement: Some("split"),
             target_pane: Some("w1:p1"),
             direction: Some("right"),
-            no_focus: true,
+            focus: true,
             env: &[("FZF_TB_URL", "https://a")],
         };
         assert_eq!(
@@ -273,7 +279,7 @@ mod tests {
                 "w1:p1",
                 "--direction",
                 "right",
-                "--no-focus",
+                "--focus",
                 "--env",
                 "FZF_TB_URL=https://a"
             ]

@@ -39,7 +39,7 @@ What you see is what you can pick — no more, no less. If there is none, nothin
 
 | Key | Action |
 |---|---|
-| `enter` | open in terminal-browser (split, or new tab if one is already open in this herdr tab) |
+| `enter` | open in terminal-browser and focus it (split, or new tab if one is already open in this herdr tab) |
 | `ctrl-y` | copy to clipboard |
 | `esc` | cancel |
 
@@ -70,7 +70,8 @@ The picker asks herdr for the pane's viewport (`herdr pane get`), reads exactly 
 URLs, and runs fzf. To open, it runs `terminal-browser ls` with `HERDR_PANE_ID` / `HERDR_TAB_ID` set to the source
 pane, so it sees the browsers in that herdr tab. If there is one, the URL goes to it with
 `terminal-browser new-tab`; otherwise the picker asks herdr for a split pane next to the source pane
-whose command is `terminal-browser open <url>` — focus stays where you were either way.
+whose command is `terminal-browser open <url>`. Either way focus moves to the browser, so you can
+scroll the page straight away; `prefix+h` (or your own pane-navigation key) goes back.
 
 The plugin runs only `herdr`, `fzf`, `terminal-browser`, and (for `ctrl-y`) the platform's clipboard tool,
 and writes nothing outside its build directory. There is no configuration in this release.

@@ -15,6 +15,8 @@ pub struct BrowserInstance {
     pub key: String,
     /// True when the browser lives in the same herdr tab as the source pane.
     pub in_current_tab: bool,
+    /// The herdr pane the browser draws in, when the listing reports one.
+    pub pane_id: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -60,12 +62,18 @@ pub trait TerminalBrowser {
     /// A new browser in a split to the right of the source pane, showing `url`.
     fn open_split(&self, source: &SourcePane, url: &str) -> Result<(), TbError>;
 
-    /// `terminal-browser new-tab --browser <key> <url>`.
-    fn new_tab(&self, source: &SourcePane, key: &str, url: &str) -> Result<(), TbError>;
+    /// `terminal-browser new-tab --browser <key> <url>`, then focus the browser's pane.
+    fn new_tab(
+        &self,
+        source: &SourcePane,
+        browser: &BrowserInstance,
+        url: &str,
+    ) -> Result<(), TbError>;
 }
 
 /// Opens the URL next to the source pane: as a new tab of a browser already in that herdr tab,
-/// or — when there is none — as a new browser split off the source pane.
+/// or — when there is none — as a new browser split off the source pane. Either way the browser
+/// ends up focused, since opening a URL means wanting to look at it.
 ///
 /// `ls --json` exposes no start time, so with several browsers in the tab the one with the highest
 /// pid (the most recently started) wins.
@@ -76,7 +84,7 @@ pub fn open_url<T: TerminalBrowser>(tb: &T, source: &SourcePane, url: &str) -> R
         .filter(|b| b.in_current_tab)
         .max_by_key(|b| (key_order(&b.key), b.key.as_str()))
     {
-        Some(browser) => tb.new_tab(source, &browser.key, url),
+        Some(browser) => tb.new_tab(source, browser, url),
         None => tb.open_split(source, url),
     }
 }
@@ -97,7 +105,7 @@ mod tests {
     enum Call {
         List,
         Split(String),
-        NewTab(String, String),
+        NewTab(String, Option<String>, String),
     }
 
     #[derive(Default)]
@@ -115,10 +123,17 @@ mod tests {
             self.calls.borrow_mut().push(Call::Split(url.into()));
             Ok(())
         }
-        fn new_tab(&self, _: &SourcePane, key: &str, url: &str) -> Result<(), TbError> {
-            self.calls
-                .borrow_mut()
-                .push(Call::NewTab(key.into(), url.into()));
+        fn new_tab(
+            &self,
+            _: &SourcePane,
+            browser: &BrowserInstance,
+            url: &str,
+        ) -> Result<(), TbError> {
+            self.calls.borrow_mut().push(Call::NewTab(
+                browser.key.clone(),
+                browser.pane_id.clone(),
+                url.into(),
+            ));
             Ok(())
         }
     }
@@ -127,6 +142,7 @@ mod tests {
         BrowserInstance {
             key: key.into(),
             in_current_tab: in_tab,
+            pane_id: Some(format!("w1:p{key}")),
         }
     }
 
@@ -157,7 +173,11 @@ mod tests {
             ]),
             vec![
                 Call::List,
-                Call::NewTab("10000-1".into(), "https://a".into())
+                Call::NewTab(
+                    "10000-1".into(),
+                    Some("w1:p10000-1".into()),
+                    "https://a".into()
+                )
             ]
         );
     }
