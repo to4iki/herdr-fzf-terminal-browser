@@ -1,18 +1,18 @@
 # herdr-fzf-terminal-browser
 
-A [herdr](https://herdr.dev) plugin: press a key, pick a URL printed in the current pane with `fzf`,
-and it opens in [terminal-browser](https://terminal-browser.com/) — right next to the pane you are in.
+A herdr plugin: press a key, pick a URL printed in the current pane with `fzf`,
+and it opens in terminal-browser — right next to the pane you are in.
 
 - No terminal-browser in this herdr tab yet: one opens as a split to the right of the pane.
 - Already one there: the URL opens as a new tab in it.
 
 Everything stays inside the terminal: an agent's output on the left, the page it linked on the right.
-The picker idea comes from tmux-fzf-url; the implementation is written for herdr and coding-agent output
+The picker idea comes from [tmux-fzf-url](https://github.com/wfxr/tmux-fzf-url); the implementation is written for herdr and coding-agent output
 (dev-server addresses like `localhost:5173` are recognised, Markdown links and JSON-embedded URLs come out clean).
 
 ## Requirements
 
-- herdr ≥ 0.8.2
+- [herdr](https://herdr.dev) ≥ 0.8.2
 - [terminal-browser](https://terminal-browser.com/) (run `terminal-browser setup` once)
 - [fzf](https://github.com/junegunn/fzf)
 - Rust toolchain (`cargo`) — the plugin is built from source when installed
@@ -62,16 +62,14 @@ Wikipedia-style `Foo_(bar)` is kept). Duplicates collapse to their newest occurr
 
 ## How it works
 
-`prefix+f` runs the plugin action `pick`. Actions have no TTY, so it checks the pane for URLs and,
-if there are any, opens the `picker` popup, passing the pane along as `FZF_TB_SOURCE_PANE` /
-`FZF_TB_SOURCE_TAB`.
-The picker asks herdr for the pane's viewport (`herdr pane get`), reads exactly that many rows with
-`herdr pane read --source recent-unwrapped` (or `--source visible` while scrolled back), extracts
-URLs, and runs fzf. To open, it runs `terminal-browser ls` with `HERDR_PANE_ID` / `HERDR_TAB_ID` set to the source
-pane, so it sees the browsers in that herdr tab. If there is one, the URL goes to it with
-`terminal-browser new-tab`; otherwise the picker asks herdr for a split pane next to the source pane
-whose command is `terminal-browser open <url>`. Either way focus moves to the browser, so you can
-scroll the page straight away; `prefix+h` (or your own pane-navigation key) goes back.
+`prefix+f` runs the plugin action `pick`. An action has no TTY, so it only looks for URLs and, if it
+finds any, opens the `picker` popup for that pane.
+
+The picker reads the pane's screen with `herdr pane read`, runs fzf over the URLs it finds, and hands
+the chosen one to `terminal-browser`: a new tab when a browser is already in this herdr tab, a new
+split pane otherwise. Every `terminal-browser` call names the source pane, so the browser lands
+beside the pane you pressed the key in, and focus follows it there (for a browser the plugin opened
+itself — one you started by hand keeps the focus where it was).
 
 The plugin runs only `herdr`, `fzf`, `terminal-browser`, and (for `ctrl-y`) the platform's clipboard tool,
 and writes nothing outside its build directory. There is no configuration in this release.
@@ -84,18 +82,24 @@ Kept out of the first release on purpose. Open an issue if one of these would he
 - Scanning scrollback beyond the current screen
 - Multi-select
 - Talking to the herdr socket directly instead of spawning the `herdr` CLI (≈30 ms per call saved)
-- Reusing an existing browser via its control socket instead of `terminal-browser ls` + `new-tab`
-  (the `terminal-browser` CLI costs ≈175 ms to start)
 - URLs hidden behind OSC 8 hyperlinks (`pane read --format ansi`)
 - Ctrl+click on a URL (`[[link_handlers]]`) opening in terminal-browser
 
 ## Command line
 
-The binary herdr runs is also usable from a shell inside herdr:
+Open the picker without a keybinding:
 
 ```sh
-herdr-fzf-terminal-browser open https://example.com      # open next to the current pane
-herdr pane read "$HERDR_PANE_ID" --source visible | herdr-fzf-terminal-browser extract
+herdr plugin action invoke to4iki.fzf-terminal-browser.pick
+```
+
+`open` and `extract` are subcommands of the binary rather than plugin actions, so `action invoke`
+does not reach them; run the binary from the plugin directory (a checkout you linked with
+`herdr plugin link`, or the `plugin_root` in `herdr plugin list --json`):
+
+```sh
+./target/release/herdr-fzf-terminal-browser open https://example.com   # open next to this pane
+herdr pane read "$HERDR_PANE_ID" --source visible | ./target/release/herdr-fzf-terminal-browser extract
 ```
 
 ## Development
