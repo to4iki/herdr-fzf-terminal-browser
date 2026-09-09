@@ -1,5 +1,7 @@
 # herdr-fzf-terminal-browser
 
+![herdr 0.8.2+](https://img.shields.io/badge/herdr-0.8.2%2B-8a2be2)
+
 A herdr plugin: press a key, pick a URL printed in the current pane with `fzf`,
 and it opens in terminal-browser — right next to the pane you are in.
 
@@ -9,6 +11,8 @@ and it opens in terminal-browser — right next to the pane you are in.
 Everything stays inside the terminal: an agent's output on the left, the page it linked on the right.
 The picker idea comes from [tmux-fzf-url](https://github.com/wfxr/tmux-fzf-url); the implementation is written for herdr and coding-agent output
 (dev-server addresses like `localhost:5173` are recognised, Markdown links and JSON-embedded URLs come out clean).
+
+<img src="docs/demo.gif" width="800">
 
 ## Requirements
 
