@@ -7,7 +7,6 @@ description = "herdr plugin: pick a URL from the current pane with fzf and open 
 license = "MIT"
 repository = "https://github.com/to4iki/herdr-fzf-terminal-browser"
 readme = "README.md"
-publish = false
 
 [[bin]]
 name = "herdr-fzf-terminal-browser"
