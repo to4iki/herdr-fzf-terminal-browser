@@ -86,7 +86,7 @@ pub struct PluginPaneOpen<'a> {
 }
 
 /// Opens a plugin pane entrypoint.
-pub fn plugin_pane_open(env: &Env, opts: &PluginPaneOpen) -> Result<(), HerdrError> {
+pub fn plugin_pane_open(env: &Env, opts: &PluginPaneOpen<'_>) -> Result<(), HerdrError> {
     run(env, plugin_pane_open_args(opts)).map(|_| ())
 }
 
@@ -126,7 +126,7 @@ fn pane_read_args(pane_id: &str, source: ReadSource) -> Vec<String> {
     args
 }
 
-fn plugin_pane_open_args(opts: &PluginPaneOpen) -> Vec<String> {
+fn plugin_pane_open_args(opts: &PluginPaneOpen<'_>) -> Vec<String> {
     let mut args = [
         "plugin",
         "pane",
