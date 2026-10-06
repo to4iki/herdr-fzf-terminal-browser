@@ -1,6 +1,6 @@
 [package]
 name = "herdr-fzf-terminal-browser"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 description = "herdr plugin: pick a URL from the current pane with fzf and open it in terminal-browser"
