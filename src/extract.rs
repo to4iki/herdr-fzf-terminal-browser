@@ -266,9 +266,9 @@ mod tests {
                 "http://localhost:5173",
             ]
         );
-        assert!(
-            extract_urls("localhost is fine; server 192.168.1.1 up; tool v1.2.3.4; 256.1.1.1:80")
-                .is_empty()
+        assert_eq!(
+            extract_urls("localhost is fine; server 192.168.1.1 up; tool v1.2.3.4; 256.1.1.1:80"),
+            [] as [String; 0]
         );
     }
 
